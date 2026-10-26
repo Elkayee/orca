@@ -259,7 +259,7 @@ export class StructuredAgentSessionHost {
   flushStreamedEvents = (id: string): Promise<void> => this.runtimeState.flushEventSink(id)
 
   /** Quit stops delivery and queued-card handover. */
-  stopDelivery = () => [this.conversationDelivery, this.queued.drain].forEach((d) => d.dispose())
+  stopDelivery = () => this.conversationCommands.stop(this.conversationDelivery, this.queued.drain)
 
   async flushAllStreamedEvents(options?: { trigger?: 'quit' | 'update' }): Promise<void> {
     this.stopDelivery()
