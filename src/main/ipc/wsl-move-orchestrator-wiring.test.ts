@@ -134,10 +134,16 @@ function requestIdOf(payload: unknown): string {
     : ''
 }
 
+/** The profile's projects: one bridge project on Ubuntu keeps its record from being pruned. */
+const profile = vi.hoisted(() => ({
+  repos: [{ id: 'r1', path: '\\\\wsl.localhost\\Ubuntu\\home\\dev\\app', connectionId: null }]
+}))
+
 async function register(): Promise<void> {
   const { registerWslMoveOrchestrator } = await import('./wsl-move-orchestrator-wiring')
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The driver is mocked; the wiring only passes deps through.
-  registerWslMoveOrchestrator({} as never, () => ({ now: () => new Date(0) }) as never)
+  const store = { getRepos: () => profile.repos, getFolderWorkspaces: () => [] }
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The wiring reads only the projects of the store, and the driver is mocked.
+  registerWslMoveOrchestrator(store as never, () => ({ now: () => new Date(0) }) as never)
 }
 
 /** Answers every slept-pane request the window has been sent. */
@@ -306,7 +312,10 @@ describe('WSL move orchestrator wiring', () => {
     }
     const records = await handlers.get('wslMoveOrchestrator:list')?.({})
     expect(records).toEqual([
-      expect.objectContaining({ distro: 'Ubuntu', state: { kind: 'parked', reason: 'declined' } })
+      expect.objectContaining({
+        distro: 'Ubuntu',
+        state: { kind: 'parked', reason: 'declined', cause: 'released-here' }
+      })
     ])
   })
 

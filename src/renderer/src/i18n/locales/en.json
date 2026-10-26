@@ -21561,6 +21561,15 @@
     },
     "reloadToast": {
       "title": "Reload to finish the move"
+    },
+    "orchestrator": {
+      "showTerminal": "Show terminal",
+      "moveAgain": "Move again",
+      "checkAgain": "Check again",
+      "deferred": "Finishing your move to the {{distro}} host: some terminals are still busy.",
+      "stuck": "An earlier move to the {{distro}} host hasn't finished settling.",
+      "declined": "Moving is paused because you brought these projects back to this computer.",
+      "doneToast": "Projects moved to the {{distro}} host"
     }
   },
   "onboarding": {

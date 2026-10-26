@@ -54,7 +54,8 @@ const stateSchema = z.discriminatedUnion('kind', [
       'removal-pending',
       'stuck'
     ]),
-    until: z.number().optional()
+    until: z.number().optional(),
+    cause: z.enum(['released-here', 'removed']).optional()
   }),
   z.object({
     kind: z.literal('done'),

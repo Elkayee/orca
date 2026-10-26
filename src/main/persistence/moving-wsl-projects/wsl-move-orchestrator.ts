@@ -11,6 +11,7 @@ import type { WslMoveOrchestratorPorts } from './wsl-move-orchestrator-ports'
 import { readWslMoveFinishedMove, runWslMoveOrchestratorStep } from './wsl-move-orchestrator-step'
 import { wslMoveJournalKey } from '../../../shared/wsl-move/wsl-move-cutover'
 import type {
+  WslMoveOrchestratorDeclineCause,
   WslMoveOrchestratorRecord,
   WslMoveOrchestratorTrigger,
   WslMoveOrchestratorUserAction
@@ -59,6 +60,7 @@ export class WslMoveOrchestrator {
     for (const [key, record] of this.records) {
       this.scheduleFor(key, record)
     }
+    this.prune()
   }
 
   list(): WslMoveOrchestratorRecord[] {
@@ -146,13 +148,37 @@ export class WslMoveOrchestrator {
    * "Use on this computer again" ran for the distro, or the user removed its host: park it until
    * the user adds the host or presses Retry.
    */
-  releasedByUser(distro: string): void {
+  releasedByUser(distro: string, cause: WslMoveOrchestratorDeclineCause): void {
     const key = wslMoveJournalKey(distro)
     this.commit(
       key,
       'user',
-      applyWslMoveReleasedByUser(this.recordFor(key, distro), this.ports.now())
+      applyWslMoveReleasedByUser(this.recordFor(key, distro), this.ports.now(), cause)
     )
+    this.prune()
+  }
+
+  /**
+   * Drops records of distros with neither a WSL host nor bridge projects left: nothing can wake
+   * them, and the status line would describe a distro the user no longer has.
+   */
+  prune(): void {
+    let changed = false
+    for (const [key, record] of this.records) {
+      if (
+        !this.busy.has(key) &&
+        record.state.kind !== 'moving' &&
+        !this.ports.isDistroInUse(record.distro)
+      ) {
+        this.records.delete(key)
+        this.timers.get(key)?.()
+        this.timers.delete(key)
+        changed = true
+      }
+    }
+    if (changed) {
+      this.saveAndPublish()
+    }
   }
 
   async userAction(
@@ -253,19 +279,23 @@ export class WslMoveOrchestrator {
       return previous ?? next
     }
     this.records.set(key, next)
+    // Every new attempt is reported too, so a backoff series shows each failure.
+    if (previous?.state.kind !== next.state.kind || previous.attempts !== next.attempts) {
+      this.ports.track(trigger, next, cause)
+    }
+    this.saveAndPublish()
+    this.scheduleFor(key, next)
+    return next
+  }
+
+  private saveAndPublish(): void {
     try {
       this.ports.save(this.records)
     } catch (error) {
       // The sidecar is the orchestrator's memory, not the move's record: keep going in memory.
       console.warn('[wsl-move] Orchestrator state not saved:', error)
     }
-    // Every new attempt is reported too, so a backoff series shows each failure.
-    if (previous?.state.kind !== next.state.kind || previous.attempts !== next.attempts) {
-      this.ports.track(trigger, next, cause)
-    }
     this.ports.publish(this.list())
-    this.scheduleFor(key, next)
-    return next
   }
 
   private scheduleFor(key: string, record: WslMoveOrchestratorRecord): void {

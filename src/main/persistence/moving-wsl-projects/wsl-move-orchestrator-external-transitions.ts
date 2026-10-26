@@ -3,6 +3,7 @@
  * (Retry, Not now, a release, a host Add or Remove), R38 distro verdicts, and startup settling.
  */
 import type {
+  WslMoveOrchestratorDeclineCause,
   WslMoveOrchestratorRecord,
   WslMoveOrchestratorUserAction
 } from '../../../shared/wsl-move/wsl-move-orchestrator-types'
@@ -64,9 +65,10 @@ export function applyWslMoveUserAction(
 /** "Use on this computer again" is the user saying no: nothing moves the distro until Retry. */
 export function applyWslMoveReleasedByUser(
   record: WslMoveOrchestratorRecord,
-  now: number
+  now: number,
+  cause: WslMoveOrchestratorDeclineCause
 ): WslMoveOrchestratorRecord {
-  return withWslMoveOrchestratorState(record, { kind: 'parked', reason: 'declined' }, now)
+  return withWslMoveOrchestratorState(record, { kind: 'parked', reason: 'declined', cause }, now)
 }
 
 /** The user added the host themselves: a decline (theirs, by Remove or release) is taken back. */
@@ -95,7 +97,7 @@ export function applyWslMoveHostRemovalSettled(
 ): WslMoveOrchestratorRecord {
   return withWslMoveOrchestratorState(
     record,
-    hostKept ? { kind: 'pending' } : { kind: 'parked', reason: 'declined' },
+    hostKept ? { kind: 'pending' } : { kind: 'parked', reason: 'declined', cause: 'removed' },
     now
   )
 }

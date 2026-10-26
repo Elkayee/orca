@@ -18,6 +18,11 @@ import {
 } from '../persistence/moving-wsl-projects/wsl-move-driver'
 import { wslMovedDistroVerdict } from '../persistence/moving-wsl-projects/wsl-move-moved-distro-check'
 import { WslMoveOrchestrator } from '../persistence/moving-wsl-projects/wsl-move-orchestrator'
+import {
+  isLocalWslMoveRow,
+  wslMoveHostDistro
+} from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
+import { parseWslUncPath } from '../../shared/wsl-paths'
 import type {
   WslMoveFinishedMove,
   WslMoveHostReadiness
@@ -80,6 +85,36 @@ function isHostReady(distro: string): boolean {
   )
 }
 
+/** A bridge project of the distro (local, on its UNC path, not moved) or its WSL host. */
+function isDistroInUse(store: Store, distro: string): boolean {
+  if (getWslHostService()?.recordForEnvironment(defaultWslOrcadEnvironmentId(distro))) {
+    return true
+  }
+  const key = wslMoveJournalKey(distro)
+  const onDistro = (path: string): boolean => {
+    const unc = parseWslUncPath(path)
+    return unc !== null && wslMoveJournalKey(unc.distro) === key
+  }
+  return (
+    store
+      .getRepos()
+      .some(
+        (repo) =>
+          isLocalWslMoveRow(repo) &&
+          onDistro(repo.path) &&
+          wslMoveHostDistro({ repoId: repo.id }) === null
+      ) ||
+    store
+      .getFolderWorkspaces()
+      .some(
+        (folder) =>
+          isLocalWslMoveRow(folder) &&
+          onDistro(folder.folderPath) &&
+          wslMoveHostDistro({ folderWorkspaceId: folder.id }) === null
+      )
+  )
+}
+
 function prepareHost(
   userDataPath: string,
   distro: string,
@@ -121,6 +156,7 @@ function createOrchestrator(
     appVersion: app.getVersion(),
     autoMoveEnabled: () => process.env[WSL_MOVE_ORCHESTRATOR_AUTO_ENV] !== '0',
     prepareHost: (distro, stillWanted) => prepareHost(userDataPath, distro, stillWanted),
+    isDistroInUse: (distro) => isDistroInUse(store, distro),
     hostRemovalPending: (distro) => wslHostRemovalPending(userDataPath, distro),
     hasHost: (distro) =>
       getWslHostService()?.recordForEnvironment(defaultWslOrcadEnvironmentId(distro)) != null,
@@ -268,10 +304,12 @@ export function registerWslMoveOrchestrator(
     const created = createOrchestrator(store, driverDeps)
     orchestrator = created
     followHostReadiness(created)
-    onWslMoveReleasedByUser((distro) => created.releasedByUser(distro))
+    onWslMoveReleasedByUser((distro) => created.releasedByUser(distro, 'released-here'))
     // A Remove is the user declining the host; only their own Add (or Retry) takes it back.
     onWslHostUserAction(({ kind, distro }) =>
-      kind === 'removed' ? created.releasedByUser(distro) : created.hostAddedByUser(distro)
+      kind === 'removed'
+        ? created.releasedByUser(distro, 'removed')
+        : created.hostAddedByUser(distro)
     )
   } catch (error) {
     console.warn('[wsl-move] Move orchestrator did not start:', error)

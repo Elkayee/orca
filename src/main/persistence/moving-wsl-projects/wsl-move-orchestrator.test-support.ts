@@ -57,6 +57,7 @@ export function fakePorts(overrides: Partial<WslMoveOrchestratorPorts> = {}): Fa
     isHostReady: vi.fn(() => true),
     hostRemovalPending: vi.fn(() => false),
     hasHost: vi.fn(() => true),
+    isDistroInUse: vi.fn(() => true),
     preview: vi.fn(async (distro: string) => ready(distro)),
     start: vi.fn(async () => moved),
     finishedMove: () => null,

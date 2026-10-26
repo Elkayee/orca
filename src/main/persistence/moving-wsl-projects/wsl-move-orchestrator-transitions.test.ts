@@ -261,8 +261,12 @@ describe('review fixes (#33802)', () => {
 
   // 2: "Use on this computer again" is a deliberate no, with no expiry.
   it('parks a distro the user brought back until Retry', () => {
-    const declined = applyWslMoveReleasedByUser(record({ kind: 'done', migrationId: 'm1' }), NOW)
-    expect(declined.state).toEqual({ kind: 'parked', reason: 'declined' })
+    const declined = applyWslMoveReleasedByUser(
+      record({ kind: 'done', migrationId: 'm1' }),
+      NOW,
+      'released-here'
+    )
+    expect(declined.state).toEqual({ kind: 'parked', reason: 'declined', cause: 'released-here' })
     expect(mayStartWslMove(declined, 'project-opened', NOW + 365 * 86_400_000, '9.0.0')).toBe(false)
     expect(mayStartWslMove(declined, 'user', NOW, '1.0.0')).toBe(true)
   })
@@ -357,7 +361,7 @@ describe('review fixes (#33802)', () => {
   })
 
   it('takes back only a decline when the user adds the host', () => {
-    const declined = record({ kind: 'parked', reason: 'declined' })
+    const declined = record({ kind: 'parked', reason: 'declined', cause: 'released-here' })
     expect(applyWslMoveHostAddedByUser(declined, NOW).state).toEqual({ kind: 'pending' })
     const snoozed = record({ kind: 'parked', reason: 'not-now', until: NOW })
     expect(applyWslMoveHostAddedByUser(snoozed, NOW)).toBe(snoozed)

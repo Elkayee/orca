@@ -25,6 +25,7 @@ import {
   useWslMoveDialogStore
 } from './wsl-move-dialog-store'
 import { collectWslMoveSleptPaneBindings } from './wsl-move-slept-pane-bindings'
+import { followWslMoveOrchestratorStatus } from './wsl-move-orchestrator-status'
 import { findWorktreeById } from '@/store/github/worktree-refresh'
 import { getWslDistroFromPath } from '@/lib/local-preflight-context'
 import {
@@ -79,6 +80,8 @@ export function WslMoveDialogHost(): React.JSX.Element | null {
   const open = useWslMoveDialogStore(
     (s) => s.dialog.stage !== 'closed' && !('hidden' in s.dialog && s.dialog.hidden)
   )
+  // D3a-2: the per-distro move state for the host rows' status lines, only while hosts are on.
+  useEffect(() => (enabled ? followWslMoveOrchestratorStatus() : undefined), [enabled])
   // A run this window did not start (it reloaded mid-move) still gets its progress and reload.
   useEffect(
     () => (enabled ? window.api.wslMove.onProgress(adoptWslMoveProgress) : undefined),

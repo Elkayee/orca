@@ -18,6 +18,9 @@ export type WslMoveOrchestratorTrigger =
   /** A backoff retry or deferred re-check; runs only while the host stays ready. */
   | 'timer'
 
+/** "Use on this computer again" (`released-here`) or a Remove of the distro's host (`removed`). */
+export type WslMoveOrchestratorDeclineCause = 'released-here' | 'removed'
+
 /** Why the orchestrator stopped trying on its own; each needs the user. */
 export type WslMoveOrchestratorParkReason =
   | 'export-incomplete'
@@ -46,7 +49,13 @@ export type WslMoveOrchestratorState =
   | { kind: 'waiting-for-host'; migrationId: string }
   /** `waits`: uncounted checks so far (an earlier move still settling), for their cap. */
   | { kind: 'backoff'; nextAttemptAt: number; reason: string; waits?: number }
-  | { kind: 'parked'; reason: WslMoveOrchestratorParkReason; until?: number }
+  | {
+      kind: 'parked'
+      reason: WslMoveOrchestratorParkReason
+      until?: number
+      /** For `declined`: which choice of the user's declined it. */
+      cause?: WslMoveOrchestratorDeclineCause
+    }
   /**
    * `nextCheckAt` / `waits` while a newer preview waits on this move to finish settling:
    * new projects may be queued behind it, so the wait is re-checked and capped like a backoff.
