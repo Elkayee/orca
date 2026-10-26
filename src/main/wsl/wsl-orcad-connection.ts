@@ -157,7 +157,8 @@ export class WslOrcadConnectionManager {
   async retireListener(distro: string): Promise<void> {
     const key = wslDistroHolderKey(distro)
     const entry = this.active.get(key)
-    if (entry) {
+    // A user connect in flight owns the next entry; retiring it would undo that connect.
+    if (entry && !this.inFlight.has(key)) {
       await this.drop(key, entry)
     }
   }

@@ -334,6 +334,25 @@ describe('WslOrcadLivenessSupervisor', () => {
     expect(h.statuses.at(-1)).toEqual({ state: 'ready', census: null })
   })
 
+  it('never reports ready or holds the distro on a wake after the listener was retired', async () => {
+    const h = harness({ visible: false })
+    // No pid file at arm: the port is the only liveness evidence.
+    h.state.identity = { distroInstance: 'boot:1', orcad: null }
+    await h.supervisor.connect('Ubuntu')
+    h.state.watchSignal = 'refused'
+    h.lastWatch().exit(0)
+    await h.advance(60_000)
+    expect(h.retireListener).toHaveBeenCalledOnce()
+    // Before the fix, a missing connection read as a port that answered.
+    h.state.watchSignal = 'ready'
+    const holds = h.ensureHolder.mock.calls.length
+    h.power()?.onResume()
+    await h.advance(60_000)
+    expect(h.statuses.filter((status) => status.state === 'ready')).toEqual([])
+    expect(h.ensureHolder).toHaveBeenCalledTimes(holds)
+    expect(h.ensure).toHaveBeenCalledTimes(1)
+  })
+
   it('leaves an orcad nobody uses stopped instead of undoing its idle exit', async () => {
     const h = harness({ visible: false })
     await h.supervisor.connect('Ubuntu')

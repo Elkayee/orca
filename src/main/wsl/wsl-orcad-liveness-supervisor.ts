@@ -244,9 +244,9 @@ export class WslOrcadLivenessSupervisor {
     const connection = this.deps.manager.get(entry.distro)
     await gatherWslLivenessEvidence(evidence, {
       readIdentity: () => this.deps.readIdentity(entry.distro, connection?.pid ?? null),
-      // A held watch proves the port; opening a fresh one is the probe.
+      // A held watch proves the port; a fresh one probes it; a retired listener proves nothing.
       probePort: async () =>
-        connection && !entry.watch ? this.attachWatch(entry, connection) : 'ready'
+        !connection ? 'refused' : entry.watch ? 'ready' : this.attachWatch(entry, connection)
     })
     if (entry.generation === generation) {
       await this.act(entry, classifyWslOrcadLiveness(evidence))
