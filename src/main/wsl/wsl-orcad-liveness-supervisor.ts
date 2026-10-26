@@ -35,6 +35,8 @@ import {
 } from './wsl-orcad-liveness-verdict'
 import { WslOrcadReconnectBackoff, wslOrcadVerifyRetryDelayMs } from './wsl-orcad-reconnect-backoff'
 
+const VERIFY: Trigger = { source: 'verify' }
+
 export class WslOrcadLivenessSupervisor {
   private readonly supervised = new Map<string, Supervised>()
   private readonly now: () => number
@@ -303,12 +305,9 @@ export class WslOrcadLivenessSupervisor {
     }
     await this.deps.manager.retireListener(entry.distro)
     // A confirmed stop stays down, even with visible work, until the user or a running distro (E9).
-    const generation = entry.generation
-    this.deps.deferUntilRunning(entry.distro, `wsl-orcad-liveness:${entry.key}`, () => {
-      if (entry.generation === generation) {
-        this.trigger(entry, { source: 'verify' })
-      }
-    })
+    const { generation, key } = entry
+    const verify = (): unknown => entry.generation === generation && this.trigger(entry, VERIFY)
+    this.deps.deferUntilRunning(entry.distro, `wsl-orcad-liveness:${key}`, verify)
   }
 
   private async recover(entry: Supervised, reason: WslOrcadRecoveryReason): Promise<void> {

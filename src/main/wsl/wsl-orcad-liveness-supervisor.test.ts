@@ -192,6 +192,8 @@ describe('WslOrcadLivenessSupervisor', () => {
     ])
     expect(h.readIdentity).toHaveBeenCalledTimes(1) // never exec'd into the stopped distro
     expect(h.ensure).toHaveBeenCalledTimes(1)
+    // Parked with visible work too: a dial to a kept listener would boot the distro.
+    expect(h.retireListener).toHaveBeenCalledExactlyOnceWith('Ubuntu')
     expect(h.deferred).toHaveLength(1)
     // Started by someone else: relaunch into the running distro.
     h.state.running = { status: 'confirmed', distros: ['Ubuntu'] }
