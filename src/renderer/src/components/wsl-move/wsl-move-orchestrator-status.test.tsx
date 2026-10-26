@@ -2,7 +2,6 @@
 
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { wslMoveJournalKey } from '../../../../shared/wsl-move/wsl-move-cutover'
 import type { WslMoveOrchestratorRecord } from '../../../../shared/wsl-move/wsl-move-orchestrator-types'
 
 const toasts = vi.hoisted(() => ({ calls: new Array<string>() }))
@@ -98,7 +97,7 @@ describe('following the move orchestrator (D3a-2)', () => {
 describe('the status line, by state', () => {
   const show = (state: WslMoveOrchestratorRecord['state']): string => {
     useWslMoveOrchestratorStatus.setState({
-      records: { [wslMoveJournalKey('Ubuntu')]: record(state) }
+      records: { ['ubuntu']: record(state) }
     })
     return renderLine()
   }

@@ -6,7 +6,6 @@
 import { create } from 'zustand'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
-import { wslMoveJournalKey } from '../../../../shared/wsl-move/wsl-move-cutover'
 import type { WslMoveOrchestratorRecord } from '../../../../shared/wsl-move/wsl-move-orchestrator-types'
 import { wslMoveOrchestratorParkedToast } from './wsl-move-orchestrator-copy'
 
@@ -14,15 +13,25 @@ type StatusState = { records: Record<string, WslMoveOrchestratorRecord> }
 
 export const useWslMoveOrchestratorStatus = create<StatusState>(() => ({ records: {} }))
 
+/**
+ * WSL compares distro names case-insensitively. Not the journal key from wsl-move-cutover: that
+ * module pulls node-only code into the renderer bundle.
+ */
+export function wslMoveOrchestratorDistroKey(distro: string): string {
+  return distro.trim().toLowerCase()
+}
+
 export function wslMoveOrchestratorRecordFor(
   records: Record<string, WslMoveOrchestratorRecord>,
   distro: string
 ): WslMoveOrchestratorRecord | undefined {
-  return records[wslMoveJournalKey(distro)]
+  return records[wslMoveOrchestratorDistroKey(distro)]
 }
 
 function byDistro(list: readonly WslMoveOrchestratorRecord[]) {
-  return Object.fromEntries(list.map((record) => [wslMoveJournalKey(record.distro), record]))
+  return Object.fromEntries(
+    list.map((record) => [wslMoveOrchestratorDistroKey(record.distro), record])
+  )
 }
 
 /** Toasts for what became done or parked since the last update; none for a first load. */

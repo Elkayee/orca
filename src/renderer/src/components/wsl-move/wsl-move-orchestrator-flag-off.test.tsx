@@ -6,7 +6,6 @@
  */
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { wslMoveJournalKey } from '../../../../shared/wsl-move/wsl-move-cutover'
 
 const gate = vi.hoisted(() => ({ enabled: false }))
 vi.mock('../sidebar/use-wsl-hosts-enabled', () => ({
@@ -59,7 +58,7 @@ beforeEach(() => {
   // A record a window could still hold: the row must not show it while hosts are off.
   useWslMoveOrchestratorStatus.setState({
     records: {
-      [wslMoveJournalKey('Ubuntu')]: {
+      ['ubuntu']: {
         distro: 'Ubuntu',
         state: { kind: 'parked', reason: 'stuck' },
         attempts: 0,
@@ -101,7 +100,7 @@ describe('the move status line with WSL hosts off', () => {
     cleanup()
     useWslMoveOrchestratorStatus.setState({
       records: {
-        [wslMoveJournalKey('Ubuntu')]: {
+        ['ubuntu']: {
           distro: 'Ubuntu',
           state: { kind: 'parked', reason: 'stuck' },
           attempts: 0,
