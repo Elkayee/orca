@@ -1,13 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { LaunchAgentInNewTabArgs } from './launch-agent-in-new-tab'
+import { planLaunchAgentStartupPrompt } from './launch-agent-startup-prompt-plan'
 
 const launchAgentInNewTab = vi.hoisted(() => vi.fn())
 const writeClipboardText = vi.hoisted(() => vi.fn(async () => undefined))
 const ensureDetectedAgentsForWorktree = vi.hoisted(() => vi.fn())
 const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), warning: vi.fn() }))
-const store: { settings: { disabledTuiAgents: string[]; experimentalNativeChat?: boolean } } =
-  vi.hoisted(() => ({
-    settings: { disabledTuiAgents: [] }
-  }))
+const store: {
+  settings: { disabledTuiAgents: string[]; experimentalNativeChat?: boolean }
+  folderWorkspaces: {
+    id: string
+    folderPath: string
+    projectGroupId: string
+    executionHostId: 'local'
+  }[]
+} = vi.hoisted(() => ({
+  settings: { disabledTuiAgents: [] },
+  folderWorkspaces: [
+    { id: 'project', folderPath: '/project', projectGroupId: 'group', executionHostId: 'local' }
+  ]
+}))
 
 vi.mock('@/store', () => ({ useAppStore: { getState: () => store } }))
 vi.mock('@/lib/launch-agent-in-new-tab', () => ({ launchAgentInNewTab }))
@@ -92,6 +104,70 @@ describe('launchAgentSessionContinuation', () => {
     expect(ensureDetectedAgentsForWorktree).toHaveBeenCalledWith(store, 'wt-1')
   })
 
+  it('carries a lossless single-line Codex handoff through native startup on every platform', async () => {
+    const { launchAgentSessionContinuation } = await import('./launch-agent-session-continuation')
+    const samples = [
+      'one\ntwo\r\nthree',
+      'Tiếng Việt 😀\n```js\nconst x = "quoted"\n```',
+      'C:\\folder\\file\rterminal\u001b[201~',
+      '\n\n'
+    ]
+    for (const platform of ['win32', 'darwin', 'linux'] as const) {
+      for (const prompt of samples) {
+        launchAgentInNewTab.mockImplementation((args: LaunchAgentInNewTabArgs) => {
+          expect(args.promptDelivery).toBe('auto-submit')
+          expect(args.prompt).toMatch(/^JSON: /)
+          if (!args.prompt || !args.promptDelivery) {
+            throw new Error('Missing handoff prompt')
+          }
+          expect(args.prompt).not.toMatch(/[\r\n]/)
+          expect(JSON.parse(args.prompt.slice('JSON: '.length))).toBe(prompt)
+          const plan = planLaunchAgentStartupPrompt({
+            base: { agent: args.agent, cmdOverrides: {}, platform },
+            prompt: args.prompt,
+            promptDelivery: args.promptDelivery,
+            isFollowupPath: false
+          })
+          expect(plan.pasteDraftAfterLaunch).toBeNull()
+          expect(plan.submitPastedPrompt).toBe(false)
+          expect(plan.startupPlan?.startupCommandDelivery).toBe('shell-ready')
+          expect(plan.startupPlan?.launchCommand).toContain('JSON: ')
+          expect(plan.startupPlan?.launchCommand).not.toMatch(/[\r\n]/)
+          return { surface: { kind: 'local-terminal', tabId: 'tab-new' } }
+        })
+        await expect(
+          launchAgentSessionContinuation({
+            agent: 'codex',
+            prompt,
+            worktreeId: 'folder:project',
+            initialCwd: '/project',
+            launchSource: 'sidebar'
+          })
+        ).resolves.toBe(true)
+      }
+    }
+  })
+
+  it('keeps other providers on their existing delivery path with the original text', async () => {
+    const { launchAgentSessionContinuation } = await import('./launch-agent-session-continuation')
+    ensureDetectedAgentsForWorktree.mockResolvedValue(['claude', 'antigravity'])
+    for (const agent of ['claude', 'antigravity'] as const) {
+      await launchAgentSessionContinuation({
+        agent,
+        prompt: 'unchanged\nmultiline context',
+        worktreeId: 'wt-1',
+        launchSource: 'sidebar'
+      })
+      expect(launchAgentInNewTab).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          agent,
+          prompt: 'unchanged\nmultiline context',
+          promptDelivery: agent === 'claude' ? 'draft' : 'submit-after-ready'
+        })
+      )
+    }
+  })
+
   it('stops before launch when the selected Agent is unavailable', async () => {
     ensureDetectedAgentsForWorktree.mockResolvedValue(['claude'])
     const { launchAgentSessionContinuation } = await import('./launch-agent-session-continuation')
@@ -124,7 +200,7 @@ describe('launchAgentSessionContinuation', () => {
     })
 
     expect(launchAgentInNewTab).toHaveBeenCalledWith(
-      expect.objectContaining({ agent: 'codex', promptDelivery: 'submit-after-ready' })
+      expect.objectContaining({ agent: 'codex', promptDelivery: 'auto-submit' })
     )
     await vi.waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(

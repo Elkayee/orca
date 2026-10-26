@@ -107,8 +107,13 @@ export async function launchAgentSessionContinuation({
     agent,
     worktreeId,
     ...(groupId ? { groupId } : {}),
-    prompt,
-    promptDelivery: agent === 'claude' ? ('draft' as const) : ('submit-after-ready' as const),
+    prompt: agent === 'codex' ? `JSON: ${JSON.stringify(prompt)}` : prompt,
+    promptDelivery:
+      agent === 'codex'
+        ? ('auto-submit' as const)
+        : agent === 'claude'
+          ? ('draft' as const)
+          : ('submit-after-ready' as const),
     launchSource,
     ...(initialCwd ? { initialCwd } : {}),
     onPromptDeliveryUnconfirmed: () => {
