@@ -67,3 +67,5 @@ For a failed GitHub Actions run, inspect the failed jobs and retry with `gh run 
 # Tests
 
 Avoid adding low-value tests. These might be fine for development but offer low value when checked in. [Anti-patterns](./docs/reference/test-antipatterns.md)
+
+Eligible Bounded/Architectural work invokes `dely:delivery`; Hard remains direct Codex Sol/xhigh; Spike starts no delivery Run.
