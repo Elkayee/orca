@@ -6,6 +6,7 @@ export type WslMoveOrchestratorLine =
   | { kind: 'deferred'; text: string }
   | { kind: 'stuck'; text: string }
   | { kind: 'declined'; text: string }
+  | { kind: 'paused'; text: string }
 
 export function wslMoveOrchestratorLine(
   record: WslMoveOrchestratorRecord | undefined
@@ -49,14 +50,50 @@ export function wslMoveOrchestratorLine(
               'Moving is paused because you brought these projects back to this computer.'
             )
           }
-    // The host row already explains a pending Remove; Retry would only park again.
-    case 'removal-pending':
     case 'export-incomplete':
     case 'manifest-too-large':
     case 'host-update-required':
     case 'attempts-exhausted':
+      return {
+        kind: 'paused',
+        text: translate(
+          'wslMove.orchestrator.paused',
+          'Moving projects to the {{distro}} host is paused: {{reason}}.',
+          { distro: record.distro, reason: pausedReason(state.reason) }
+        )
+      }
+    // The host row already explains a pending Remove; Retry would only park again.
+    case 'removal-pending':
     case 'not-now':
       return null
+  }
+}
+
+/** Short and calm: these wait for the user, and nothing was lost. */
+function pausedReason(
+  reason: 'export-incomplete' | 'manifest-too-large' | 'host-update-required' | 'attempts-exhausted'
+): string {
+  switch (reason) {
+    case 'export-incomplete':
+      return translate(
+        'wslMove.orchestrator.pausedReason.exportIncomplete',
+        "some saved state can't be carried over yet"
+      )
+    case 'manifest-too-large':
+      return translate(
+        'wslMove.orchestrator.pausedReason.manifestTooLarge',
+        'there is more saved state than one move can carry'
+      )
+    case 'host-update-required':
+      return translate(
+        'wslMove.orchestrator.pausedReason.hostUpdate',
+        'the host needs an update first'
+      )
+    case 'attempts-exhausted':
+      return translate(
+        'wslMove.orchestrator.pausedReason.attemptsExhausted',
+        "it didn't complete after several tries"
+      )
   }
 }
 

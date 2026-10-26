@@ -23,6 +23,7 @@ import {
   wslMoveHostDistro
 } from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
 import { parseWslUncPath } from '../../shared/wsl-paths'
+import { readWslHostDeployments } from '../../shared/wsl-host-deployment-store'
 import type {
   WslMoveFinishedMove,
   WslMoveHostReadiness
@@ -85,9 +86,19 @@ function isHostReady(distro: string): boolean {
   )
 }
 
-/** A bridge project of the distro (local, on its UNC path, not moved) or its WSL host. */
-function isDistroInUse(store: Store, distro: string): boolean {
-  if (getWslHostService()?.recordForEnvironment(defaultWslOrcadEnvironmentId(distro))) {
+/** A bridge project of the distro (local, on its UNC path, not moved) or its WSL host record. */
+function isDistroInUse(store: Store, userDataPath: string, distro: string): boolean {
+  const environmentId = defaultWslOrcadEnvironmentId(distro)
+  try {
+    const hosts = readWslHostDeployments(userDataPath)
+    if (
+      hosts.unreadableEnvironmentIds.has(environmentId) ||
+      hosts.deployments.some((record) => record.environmentId === environmentId)
+    ) {
+      return true
+    }
+  } catch {
+    // A host file that cannot be read never makes a distro look gone.
     return true
   }
   const key = wslMoveJournalKey(distro)
@@ -156,7 +167,7 @@ function createOrchestrator(
     appVersion: app.getVersion(),
     autoMoveEnabled: () => process.env[WSL_MOVE_ORCHESTRATOR_AUTO_ENV] !== '0',
     prepareHost: (distro, stillWanted) => prepareHost(userDataPath, distro, stillWanted),
-    isDistroInUse: (distro) => isDistroInUse(store, distro),
+    isDistroInUse: (distro) => isDistroInUse(store, userDataPath, distro),
     hostRemovalPending: (distro) => wslHostRemovalPending(userDataPath, distro),
     hasHost: (distro) =>
       getWslHostService()?.recordForEnvironment(defaultWslOrcadEnvironmentId(distro)) != null,

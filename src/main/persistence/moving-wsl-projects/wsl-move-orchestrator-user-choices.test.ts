@@ -377,9 +377,38 @@ describe('WslMoveOrchestrator: user choices, races and failures', () => {
       orchestrator.releasedByUser('Ubuntu', 'released-here')
       expect(orchestrator.list()).toHaveLength(1)
       inUse = false
+      // A decline is the user's choice: kept even with nothing left on the distro.
       orchestrator.releasedByUser('Ubuntu', 'removed')
-      expect(orchestrator.list()).toEqual([])
-      expect(ports.saved.size).toBe(0)
+      expect(orchestrator.list()).toHaveLength(1)
     })
+  })
+
+  // Pre-review #1: a pruned decline would let a later wake re-add a host the user removed.
+  it('never prunes a user choice, even for a distro with nothing left', () => {
+    const parked = (reason: 'declined' | 'not-now'): WslMoveOrchestratorRecord => ({
+      distro: reason === 'declined' ? 'Removed' : 'Snoozed',
+      state:
+        reason === 'declined'
+          ? { kind: 'parked', reason, cause: 'removed' }
+          : { kind: 'parked', reason, until: 2_000 },
+      attempts: 0,
+      appVersion: '1.0.0',
+      updatedAt: 0
+    })
+    const loaded = new Map<string, WslMoveOrchestratorRecord>([
+      [wslMoveJournalKey('Removed'), parked('declined')],
+      [wslMoveJournalKey('Snoozed'), parked('not-now')]
+    ])
+    const orchestrator = new WslMoveOrchestrator(
+      fakePorts({ load: () => loaded, isDistroInUse: vi.fn(() => false) })
+    )
+    expect(
+      orchestrator
+        .list()
+        .map((record) => record.distro)
+        .sort()
+    ).toEqual(['Removed', 'Snoozed'])
+    orchestrator.releasedByUser('Ubuntu', 'removed')
+    expect(stateOf(orchestrator, 'Ubuntu')).toMatchObject({ reason: 'declined', cause: 'removed' })
   })
 })

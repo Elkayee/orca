@@ -17,7 +17,8 @@ vi.mock('@/lib/reveal-terminal-pane', () => ({ revealTerminalPane: vi.fn() }))
 
 const { followWslMoveOrchestratorStatus, useWslMoveOrchestratorStatus } =
   await import('./wsl-move-orchestrator-status')
-const { WslMoveOrchestratorStatusLine } = await import('./WslMoveOrchestratorStatusLine')
+const { WslMoveOrchestratorStatusLine, showBlockingTerminal } =
+  await import('./WslMoveOrchestratorStatusLine')
 const { wslMoveOrchestratorLine } = await import('./wsl-move-orchestrator-copy')
 
 const PANE = 'tab-1:11111111-1111-4111-8111-111111111111'
@@ -131,5 +132,41 @@ describe('the status line, by state', () => {
     expect(show({ kind: 'parked', reason: 'declined', cause: 'removed' })).toBe('')
     expect(show({ kind: 'parked', reason: 'removal-pending' })).toBe('')
     expect(wslMoveOrchestratorLine(undefined)).toBeNull()
+  })
+
+  // Pre-review #2: what waits for the user gets a calm line and Check again, never "failed".
+  it('shows a neutral paused line with Check again for each reason that waits for the user', () => {
+    for (const [reason, words] of [
+      ['export-incomplete', "can't be carried over yet"],
+      ['manifest-too-large', 'more saved state than one move can carry'],
+      ['host-update-required', 'the host needs an update first'],
+      ['attempts-exhausted', "didn't complete after several tries"]
+    ] as const) {
+      const html = show({ kind: 'parked', reason })
+      expect(html).toContain('Moving projects to the Ubuntu host is paused: ')
+      expect(html).toContain(words)
+      expect(html).toContain('Check again')
+      expect(html.toLowerCase()).not.toContain('fail')
+    }
+  })
+
+  it('says each blocker in one sentence', () => {
+    const html = show({
+      kind: 'deferred',
+      blockers: [{ kind: 'automation-running', ids: ['run-1'], actions: ['wait'] }],
+      rechecks: 0
+    })
+    expect(html).toContain('Wait for it to finish, then check again.')
+    expect(html).not.toContain('Show terminal')
+  })
+})
+
+describe('Show terminal', () => {
+  // Pre-review #5: a pane that is gone gets a word back, not silence.
+  it('says so when the terminal is no longer open', () => {
+    showBlockingTerminal(PANE)
+    expect(toasts.calls).toEqual([
+      "That terminal isn't open in this window any more. Check again to refresh."
+    ])
   })
 })

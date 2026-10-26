@@ -1,4 +1,5 @@
 import React from 'react'
+import { toast } from 'sonner'
 import { CircleAlert, Info } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '@/components/ui/button'
@@ -21,22 +22,30 @@ const PANE_BLOCKERS = new Set<WslMoveBlocker['kind']>([
 ])
 
 /** Opens the busy terminal so the user can stop it there; Orca never ends it for them. */
-function showBlockingTerminal(paneKey: string): void {
+export function showBlockingTerminal(paneKey: string): void {
   const pane = parsePaneKey(paneKey)
-  if (!pane) {
-    return
-  }
   const { tabsByWorktree } = useAppStore.getState()
-  const worktreeId = Object.entries(tabsByWorktree).find(([, tabs]) =>
-    tabs.some((tab) => tab.id === pane.tabId)
-  )?.[0]
-  if (worktreeId) {
+  const worktreeId = pane
+    ? Object.entries(tabsByWorktree).find(([, tabs]) =>
+        tabs.some((tab) => tab.id === pane.tabId)
+      )?.[0]
+    : undefined
+  const shown =
+    pane !== null &&
+    worktreeId !== undefined &&
     revealTerminalPane({
       worktreeId,
       tabId: pane.tabId,
       leafId: pane.leafId,
       executionHostId: null
     })
+  if (!shown) {
+    toast(
+      translate(
+        'wslMove.orchestrator.terminalGone',
+        "That terminal isn't open in this window any more. Check again to refresh."
+      )
+    )
   }
 }
 
@@ -70,7 +79,10 @@ export function WslMoveOrchestratorStatusLine({
         <div className="text-muted-foreground">{line.text}</div>
         {blockers.map((blocker) => (
           <div key={blocker.kind} className="text-muted-foreground">
-            {`${wslMoveBlockerTitle(blocker.kind, blocker.ids.length)}. ${wslMoveBlockerHint(blocker.kind)}`}
+            {translate('wslMove.orchestrator.blocker', '{{title}}. {{hint}}', {
+              title: wslMoveBlockerTitle(blocker.kind, blocker.ids.length),
+              hint: wslMoveBlockerHint(blocker.kind)
+            })}
           </div>
         ))}
         <div className="flex gap-1.5">

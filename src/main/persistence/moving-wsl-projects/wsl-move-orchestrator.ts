@@ -31,6 +31,15 @@ import {
 /** A project opened again within this window does not read the running distros again. */
 export const WSL_MOVE_ORCHESTRATOR_PROJECT_OPENED_THROTTLE_MS = 60_000
 
+/**
+ * A user's own decision (a decline, or Not now) is never pruned: dropping it would let a later
+ * wake undo it, e.g. re-add a host the user removed.
+ */
+function recordsUserChoice(record: WslMoveOrchestratorRecord): boolean {
+  const { state } = record
+  return state.kind === 'parked' && (state.reason === 'declined' || state.reason === 'not-now')
+}
+
 export class WslMoveOrchestrator {
   private readonly records: Map<string, WslMoveOrchestratorRecord>
   private readonly busy = new Set<string>()
@@ -168,6 +177,7 @@ export class WslMoveOrchestrator {
       if (
         !this.busy.has(key) &&
         record.state.kind !== 'moving' &&
+        !recordsUserChoice(record) &&
         !this.ports.isDistroInUse(record.distro)
       ) {
         this.records.delete(key)

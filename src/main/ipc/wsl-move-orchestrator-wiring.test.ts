@@ -41,6 +41,15 @@ vi.mock('../../shared/runtime-environment-wsl-host-store', () => ({
   findWslHostDeployment: (_userData: string, environmentId: string) =>
     deployments.get(environmentId) ?? null
 }))
+const hostFile = vi.hoisted(() => ({ unreadable: false }))
+vi.mock('../../shared/wsl-host-deployment-store', () => ({
+  readWslHostDeployments: () => {
+    if (hostFile.unreadable) {
+      throw new Error('orca-wsl-host-deployments.json is not valid')
+    }
+    return { deployments: [], unreadableEnvironmentIds: new Set() }
+  }
+}))
 vi.mock('../wsl/wsl-distro-registry-id', () => ({ readWslDistroRegistrations: async () => null }))
 vi.mock('../wsl/wsl-orcad-deploy', () => ({
   defaultWslOrcadEnvironmentId: (distro: string) => `wsl:${distro}`
@@ -177,6 +186,7 @@ beforeEach(() => {
   host.running = { status: 'confirmed', distros: ['Ubuntu'] }
   host.added = []
   releases.listeners.length = 0
+  hostFile.unreadable = false
   hostActions.listeners.length = 0
   deployments.clear()
   store.reads = 0
@@ -435,5 +445,57 @@ describe('WSL move orchestrator wiring', () => {
     await answerWindow()
     expect(driver.previewWslMove).toHaveBeenCalledTimes(1)
     expect(driver.moveProjectsToWslHost).not.toHaveBeenCalled()
+  })
+
+  // Pre-review #3: a host file that cannot be read must never make a distro look gone.
+  it('prunes nothing when the WSL host file cannot be read', async () => {
+    vi.stubEnv(WSL_HOSTS_INTERNAL_GATE_ENV, '1')
+    hostFile.unreadable = true
+    const savedRepos = profile.repos
+    profile.repos = []
+    store.records = new Map([
+      [
+        'local-wsl:ubuntu',
+        {
+          distro: 'Ubuntu',
+          state: { kind: 'idle' },
+          attempts: 0,
+          appVersion: '1.0.0',
+          updatedAt: 0
+        }
+      ]
+    ])
+    try {
+      await register()
+      expect(await handlers.get('wslMoveOrchestrator:list')?.({})).toEqual([
+        expect.objectContaining({ distro: 'Ubuntu' })
+      ])
+    } finally {
+      profile.repos = savedRepos
+    }
+  })
+
+  it('prunes a distro with no host and no bridge projects once the file reads', async () => {
+    vi.stubEnv(WSL_HOSTS_INTERNAL_GATE_ENV, '1')
+    const savedRepos = profile.repos
+    profile.repos = []
+    store.records = new Map([
+      [
+        'local-wsl:ubuntu',
+        {
+          distro: 'Ubuntu',
+          state: { kind: 'idle' },
+          attempts: 0,
+          appVersion: '1.0.0',
+          updatedAt: 0
+        }
+      ]
+    ])
+    try {
+      await register()
+      expect(await handlers.get('wslMoveOrchestrator:list')?.({})).toEqual([])
+    } finally {
+      profile.repos = savedRepos
+    }
   })
 })

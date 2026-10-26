@@ -21569,7 +21569,16 @@
       "deferred": "Finishing your move to the {{distro}} host: some terminals are still busy.",
       "stuck": "An earlier move to the {{distro}} host hasn't finished settling.",
       "declined": "Moving is paused because you brought these projects back to this computer.",
-      "doneToast": "Projects moved to the {{distro}} host"
+      "doneToast": "Projects moved to the {{distro}} host",
+      "terminalGone": "That terminal isn't open in this window any more. Check again to refresh.",
+      "blocker": "{{title}}. {{hint}}",
+      "paused": "Moving projects to the {{distro}} host is paused: {{reason}}.",
+      "pausedReason": {
+        "exportIncomplete": "some saved state can't be carried over yet",
+        "manifestTooLarge": "there is more saved state than one move can carry",
+        "hostUpdate": "the host needs an update first",
+        "attemptsExhausted": "it didn't complete after several tries"
+      }
     }
   },
   "onboarding": {
