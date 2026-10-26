@@ -18,12 +18,6 @@ import {
 } from '../persistence/moving-wsl-projects/wsl-move-driver'
 import { wslMovedDistroVerdict } from '../persistence/moving-wsl-projects/wsl-move-moved-distro-check'
 import { WslMoveOrchestrator } from '../persistence/moving-wsl-projects/wsl-move-orchestrator'
-import {
-  isLocalWslMoveRow,
-  wslMoveHostDistro
-} from '../persistence/moving-wsl-projects/wsl-move-scope-guard'
-import { parseWslUncPath } from '../../shared/wsl-paths'
-import { readWslHostDeployments } from '../../shared/wsl-host-deployment-store'
 import type {
   WslMoveFinishedMove,
   WslMoveHostReadiness
@@ -48,6 +42,7 @@ import { onWslHostUserAction } from '../wsl/wsl-host-user-actions'
 import { getTrustedUIRendererWebContents, getTrustedUIRendererWindow } from './ui'
 import { onWslMoveReleasedByUser, releaseWslMoveChainHere } from './wsl-move-release-here'
 import { createWslMoveUndoPorts } from './wsl-move-undo-wiring'
+import { isDistroInUse } from './wsl-move-distro-in-use'
 import { answerWslMoveSleptPanes, requestSleptPanes } from './wsl-move-orchestrator-slept-panes'
 import { wslHostRemovalPending } from './wsl-move-host-connect'
 
@@ -83,46 +78,6 @@ function isHostReady(distro: string): boolean {
       ?.getStatuses()
       .some((status) => wslMoveJournalKey(status.distro) === key && status.state === 'ready') ??
     false
-  )
-}
-
-/** A bridge project of the distro (local, on its UNC path, not moved) or its WSL host record. */
-function isDistroInUse(store: Store, userDataPath: string, distro: string): boolean {
-  const environmentId = defaultWslOrcadEnvironmentId(distro)
-  try {
-    const hosts = readWslHostDeployments(userDataPath)
-    if (
-      hosts.unreadableEnvironmentIds.has(environmentId) ||
-      hosts.deployments.some((record) => record.environmentId === environmentId)
-    ) {
-      return true
-    }
-  } catch {
-    // A host file that cannot be read never makes a distro look gone.
-    return true
-  }
-  const key = wslMoveJournalKey(distro)
-  const onDistro = (path: string): boolean => {
-    const unc = parseWslUncPath(path)
-    return unc !== null && wslMoveJournalKey(unc.distro) === key
-  }
-  return (
-    store
-      .getRepos()
-      .some(
-        (repo) =>
-          isLocalWslMoveRow(repo) &&
-          onDistro(repo.path) &&
-          wslMoveHostDistro({ repoId: repo.id }) === null
-      ) ||
-    store
-      .getFolderWorkspaces()
-      .some(
-        (folder) =>
-          isLocalWslMoveRow(folder) &&
-          onDistro(folder.folderPath) &&
-          wslMoveHostDistro({ folderWorkspaceId: folder.id }) === null
-      )
   )
 }
 
