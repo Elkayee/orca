@@ -303,9 +303,10 @@ export class WslOrcadLivenessSupervisor {
     if (entry.state !== 'distro-stopped') {
       this.publish(entry, { state: 'distro-stopped', terminals: 'exited', recovering: false })
     }
+    // Read before the retire: a connect starting during it must make the deferred verify a no-op.
+    const { generation, key } = entry
     await this.deps.manager.retireListener(entry.distro)
     // A confirmed stop stays down, even with visible work, until the user or a running distro (E9).
-    const { generation, key } = entry
     const verify = (): unknown => entry.generation === generation && this.trigger(entry, VERIFY)
     this.deps.deferUntilRunning(entry.distro, `wsl-orcad-liveness:${key}`, verify)
   }
