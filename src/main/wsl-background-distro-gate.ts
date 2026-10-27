@@ -1,4 +1,5 @@
 import { listRunningWslDistrosAsync, listWslDistrosAsync } from './wsl'
+import { outsideWslUserAct } from './wsl/wsl-user-act-scope'
 import {
   onConfirmedRunningWslDistros,
   onRunningWslDistrosStopped,
@@ -163,7 +164,8 @@ export function noteWslDistrosRunning(distros: readonly string[]): void {
     deferredTasksByDistro.delete(keyForDistro)
     for (const task of tasks.values()) {
       try {
-        void Promise.resolve(task()).catch(logDeferredTaskFailure)
+        // A drain inside a user act must not hand its boot allowance to deferred work.
+        void Promise.resolve(outsideWslUserAct(task)).catch(logDeferredTaskFailure)
       } catch (error) {
         logDeferredTaskFailure(error)
       }

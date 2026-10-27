@@ -1,5 +1,5 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
 import { parseWslUncPath } from '../../shared/wsl-paths'
+import { isWslUserActFor, runAsWslUserAct } from './wsl-user-act-scope'
 import {
   noteWslDistroWoken,
   noteWslDistrosRunning,
@@ -8,23 +8,12 @@ import {
 } from '../wsl-background-distro-gate'
 
 export { noteWslDistroMayHaveStopped } from '../wsl-background-distro-gate'
+export { runAsWslUserAct } from './wsl-user-act-scope'
 
 // Any 9P touch of `\\wsl.localhost\<distro>` boots a stopped distro, so background reads ask first.
 // Stops are signalled (watcher or relay exit, or a read that saw it), so a running read is trusted
 // this long without one, keeping wsl.exe spawns to about one a minute.
 export const WSL_UNC_RUNNING_LEASE_MS = 60_000
-
-// The distro a user act may start; reads and Git it triggers (e.g. a roots rebuild) pass for it alone.
-const userActDistro = new AsyncLocalStorage<string>()
-
-function distroKey(distro: string): string {
-  return distro.trim().toLowerCase()
-}
-
-/** Runs a user act on `distro`: gated work inside it may start that distro, and no other. */
-export function runAsWslUserAct<T>(distro: string | null, act: () => Promise<T>): Promise<T> {
-  return distro ? userActDistro.run(distroKey(distro), act) : act()
-}
 
 export class WslDistroStoppedError extends Error {
   readonly code = 'WSL_DISTRO_STOPPED'
@@ -65,7 +54,7 @@ export async function blockedWslDistroForPath(
   wslDistro?: string | null
 ): Promise<BlockedWslDistro | null> {
   const distro = wslDistroForPath(path, wslDistro)
-  if (!distro || userActDistro.getStore() === distroKey(distro)) {
+  if (!distro || isWslUserActFor(distro)) {
     return null
   }
   const state = await readWslDistroRunningState(distro, {
