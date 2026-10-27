@@ -18,7 +18,12 @@ import { WslHostVisibleWorkByWindow } from './wsl-host-visible-work-windows'
 import type { WslHostAutomationWake } from '../wsl/wsl-host-automation-wake'
 import { createWslHostAutomationWake } from './wsl-host-automation-wake-wiring'
 import { wslHostsGateOpen } from '../wsl/wsl-host-gate'
-import { getWslHostService, setWslHostService } from '../wsl/wsl-host-service-instance'
+import {
+  getWslHostService,
+  setWslHostPhoneGate,
+  setWslHostService
+} from '../wsl/wsl-host-service-instance'
+import { WslHostPhoneGate } from '../wsl/wsl-host-phone-reach'
 import { retireRemovedRuntimeEnvironment } from './runtime-environments/runtime-environment-removal-cleanup'
 import { getRuntimeEnvironmentStatus } from './runtime-environments/runtime-environment-status-probe'
 import { callRuntimeEnvironment } from './runtime-environments/runtime-environment-transport-routing'
@@ -115,10 +120,13 @@ function createService(args: WslHostHandlerArgs): WslHostService | null {
     return null
   }
   let automationWake: WslHostAutomationWake | null = null
+  const runGate = {
+    isEnabled: () => args.store.getSettings().experimentalWslHosts === true,
+    hasServerFiles: fake ? () => fake.serverFiles !== 'missing' : hasOrcadTemplate
+  }
   const created = new WslHostService({
     userDataPath: args.getUserDataPath,
-    isEnabled: () => args.store.getSettings().experimentalWslHosts === true,
-    hasServerFiles: fake ? () => fake.serverFiles !== 'missing' : hasOrcadTemplate,
+    ...runGate,
     publish,
     pairingChanged: (environmentId) => void args.invalidateTransport(environmentId),
     ready: (environmentId) => {
@@ -144,17 +152,17 @@ function createService(args: WslHostHandlerArgs): WslHostService | null {
   const onChange = created.handleConnectionChange.bind(created)
   const isKnownDistro = (distro: string): boolean => created.isKnownDistro(distro)
   const runtime = wslHostRuntimeAccess(args.getUserDataPath)
-  created.attach(
-    fake
-      ? createFakeWslHostConnector(fake, onChange, { isKnownDistro, runtime })
-      : createWslHostConnector({
-          userDataPath: args.getUserDataPath(),
-          onChange,
-          hasUserVisibleWork: (distro) => created.hasUserVisibleWork(distro),
-          isKnownDistro,
-          runtime
-        })
-  )
+  const connector = fake
+    ? createFakeWslHostConnector(fake, onChange, { isKnownDistro, runtime })
+    : createWslHostConnector({
+        userDataPath: args.getUserDataPath(),
+        onChange,
+        hasUserVisibleWork: (distro) => created.hasUserVisibleWork(distro),
+        isKnownDistro,
+        runtime
+      })
+  created.attach(connector)
+  setWslHostPhoneGate(new WslHostPhoneGate({ service: created, connector, ...runGate }))
   automationWake = createWslHostAutomationWake(args.getUserDataPath, created)
   return created
 }
