@@ -8,10 +8,9 @@ import {
   buildHardWrappedPathLogicalLineCandidates,
   buildWrappedLogicalLine,
   rangeForParsedFileLink,
-  type TerminalLinkBuffer,
-  type TerminalLinkBufferRange,
   type WrappedLogicalLine
 } from './wrapped-terminal-link-ranges'
+import type { TerminalLinkBuffer, TerminalLinkBufferRange } from './terminal-link-buffer'
 
 /** 1-based buffer cell, matching xterm link ranges. */
 export type TerminalLinkBufferPosition = { x: number; y: number }

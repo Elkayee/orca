@@ -7,9 +7,9 @@ import {
 import {
   extractTerminalFileLinkCandidates,
   extractTerminalFileLinks,
+  findExactTerminalFileLink,
   isPathInsideWorktree,
   resolveTerminalFileLink,
-  resolveTerminalFileLinkText,
   toWorktreeRelativePath
 } from './terminal-links'
 
@@ -316,24 +316,24 @@ describe('terminal path helpers', () => {
     })
   })
 
-  it('resolves exact repo-relative OSC hyperlink text', () => {
-    expect(resolveTerminalFileLinkText('docs/README.md', '/repo')).toEqual({
-      absolutePath: '/repo/docs/README.md',
+  it('finds exact repo-relative OSC hyperlink text', () => {
+    expect(findExactTerminalFileLink('docs/README.md')).toMatchObject({
+      pathText: 'docs/README.md',
       line: null,
       column: null
     })
   })
 
   it('keeps line and column suffixes from exact OSC hyperlink text', () => {
-    expect(resolveTerminalFileLinkText('docs/README.md:12:3', '/repo')).toEqual({
-      absolutePath: '/repo/docs/README.md',
+    expect(findExactTerminalFileLink('docs/README.md:12:3')).toMatchObject({
+      pathText: 'docs/README.md',
       line: 12,
       column: 3
     })
   })
 
-  it('does not resolve partial text as an OSC hyperlink target', () => {
-    expect(resolveTerminalFileLinkText('open docs/README.md', '/repo')).toBeNull()
+  it('does not take partial text as an OSC hyperlink target', () => {
+    expect(findExactTerminalFileLink('open docs/README.md')).toBeNull()
   })
 
   describe('plain-text file:// URIs', () => {

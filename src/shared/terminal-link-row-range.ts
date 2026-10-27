@@ -1,8 +1,5 @@
-import {
-  rangeForParsedFileLink,
-  type TerminalLinkBufferRange,
-  type WrappedLogicalLine
-} from './wrapped-terminal-link-ranges'
+import { rangeForParsedFileLink, type WrappedLogicalLine } from './wrapped-terminal-link-ranges'
+import type { TerminalLinkBufferRange } from './terminal-link-buffer'
 
 export function rangeForParsedLinkOnRow(
   logicalLine: WrappedLogicalLine,

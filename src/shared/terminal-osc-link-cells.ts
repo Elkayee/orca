@@ -1,9 +1,6 @@
 import { rangeForParsedLinkOnRow } from './terminal-link-row-range'
-import type {
-  TerminalLinkBuffer,
-  TerminalLinkBufferRange,
-  WrappedLogicalLine
-} from './wrapped-terminal-link-ranges'
+import type { WrappedLogicalLine } from './wrapped-terminal-link-ranges'
+import type { TerminalLinkBuffer, TerminalLinkBufferRange } from './terminal-link-buffer'
 
 export function terminalLogicalLinkHasOscLink(
   buffer: TerminalLinkBuffer,

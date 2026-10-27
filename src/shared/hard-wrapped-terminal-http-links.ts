@@ -2,11 +2,8 @@ import {
   TERMINAL_HTTP_URL_MAX_HARD_WRAPPED_ROWS,
   TERMINAL_HTTP_URL_MAX_LENGTH
 } from './terminal-http-link-limits'
-import {
-  translateLineWithColumns,
-  type TerminalLinkBuffer,
-  type WrappedLogicalLine
-} from './wrapped-terminal-link-ranges'
+import { translateLineWithColumns, type WrappedLogicalLine } from './wrapped-terminal-link-ranges'
+import type { TerminalLinkBuffer } from './terminal-link-buffer'
 
 const HTTP_SCHEME_PATTERN = /https?:\/\//i
 const HTTP_SCHEME_START_PATTERN = /^https?:\/\//i

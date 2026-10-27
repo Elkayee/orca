@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { extractTerminalFileLinks, resolveTerminalFileLinkText } from './terminal-links'
+import { extractTerminalFileLinks, resolveTerminalFileLink } from './terminal-links'
 
 describe('CJK terminal path names', () => {
   for (const character of ['・', '･', '〜', '～']) {
@@ -19,7 +19,8 @@ describe('CJK terminal path names', () => {
     })
 
     it(`preserves location and normalized Windows target for ${character}`, () => {
-      expect(resolveTerminalFileLinkText(`C:\\tmp\\前${character}後\\a.txt:12:3`, '/cwd')).toEqual({
+      const [link] = extractTerminalFileLinks(`C:\\tmp\\前${character}後\\a.txt:12:3`)
+      expect(link && resolveTerminalFileLink(link, '/cwd')).toEqual({
         absolutePath: `C:/tmp/前${character}後/a.txt`,
         line: 12,
         column: 3
