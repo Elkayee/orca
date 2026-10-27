@@ -36,15 +36,14 @@ describe('withOwnBuildLaunchEnv', () => {
   it('keeps a class-based transport’s prototype methods', async () => {
     class ClassTransport {
       readonly prefix = 'ran:'
-      exec(command: string): string {
+      describe(command: string): string {
         return `${this.prefix}${command}`
       }
     }
     // The wrapper only reads orcadLaunchEnv; a bare instance stands in for the full transport.
-    const transport: OrcadHostTransport = Object.create(new ClassTransport())
+    const transport: OrcadHostTransport & ClassTransport = Object.create(new ClassTransport())
     const conn = withOwnBuildLaunchEnv(transport, () => null)
-    expect(Reflect.get(conn, 'exec')).toBe(ClassTransport.prototype.exec)
-    expect(Reflect.get(conn, 'prefix')).toBe('ran:')
+    expect(conn.describe('true')).toBe('ran:true')
     await expect(conn.orcadLaunchEnv?.({ fullVersion: '0.1.0+own' })).resolves.toEqual([])
   })
 })
