@@ -258,6 +258,11 @@ describe.runIf(RELAY)('the bash stdio bridge', () => {
     }
   })
 
+  it('reaps both cats before it exits, so no zombie is left for the session init', async () => {
+    // WSL's per-session init never reaps orphans; a zombie there kept an idle distro running (R40).
+    expect(orcadBashStdioBridgeCommand(1)).toContain('kill $r $w 2>/dev/null; wait; exit 0')
+  })
+
   it('closes orcad’s socket as soon as the desktop ends stdin', async () => {
     const server = createServer()
     const ended = new Promise<void>((resolve) => {
