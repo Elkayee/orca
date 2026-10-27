@@ -34,20 +34,31 @@ export class WslDistroUnverifiableError extends Error {
 
 export type BlockedWslDistro = { distro: string; state: Exclude<WslDistroRunningState, 'running'> }
 
-/** Why a background touch of `path` must not happen now, or null when it is safe. */
-export async function blockedWslDistroForPath(path: string): Promise<BlockedWslDistro | null> {
+/** The distro a touch of `path` (or Git run for it) would run in; null off Windows or for a host path. */
+export function wslDistroForPath(path: string, wslDistro?: string | null): string | null {
   if (process.platform !== 'win32') {
     return null
   }
-  const parsed = parseWslUncPath(path)
-  if (!parsed) {
+  return parseWslUncPath(path)?.distro ?? wslDistro ?? null
+}
+
+/**
+ * Why a background touch of `path` must not happen now, or null when it is safe. `wslDistro` covers
+ * a host path whose Git still runs through `wsl.exe` in that distro.
+ */
+export async function blockedWslDistroForPath(
+  path: string,
+  wslDistro?: string | null
+): Promise<BlockedWslDistro | null> {
+  const distro = wslDistroForPath(path, wslDistro)
+  if (!distro) {
     return null
   }
-  const state = await readWslDistroRunningState(parsed.distro, {
+  const state = await readWslDistroRunningState(distro, {
     startedAfter: performance.now() - WSL_UNC_RUNNING_LEASE_MS,
     retryUnverifiable: true
   })
-  return state === 'running' ? null : { distro: parsed.distro, state }
+  return state === 'running' ? null : { distro, state }
 }
 
 /**
@@ -71,9 +82,12 @@ export async function guardWslUncPathAccess<T>(
   return access()
 }
 
-/** Throws when a background touch of `path` would boot its distro, or WSL can't say it won't. */
-export async function assertWslUncPathRunning(path: string): Promise<void> {
-  const blocked = await blockedWslDistroForPath(path)
+/** Throws when a background touch of `path` (or its Git) would boot a distro, or WSL can't say it won't. */
+export async function assertWslUncPathRunning(
+  path: string,
+  wslDistro?: string | null
+): Promise<void> {
+  const blocked = await blockedWslDistroForPath(path, wslDistro)
   if (blocked?.state === 'stopped') {
     throw new WslDistroStoppedError(blocked.distro)
   }
