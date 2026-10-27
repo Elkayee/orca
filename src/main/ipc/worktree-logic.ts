@@ -10,6 +10,7 @@ import {
 } from '../../shared/emoji-shortcode-catalog'
 import { requireEmojiShortcodeDataset } from './deferred-emoji-shortcode-dataset'
 import { getWslHome, getWslHomeAsync, parseWslPath } from '../wsl'
+import { wslHomeUnlessStopped } from '../wsl/wsl-home-unless-stopped'
 
 setEmojiShortcodeDatasetLoader(requireEmojiShortcodeDataset)
 
@@ -132,7 +133,7 @@ export async function computeWorkspaceRootWithin(
     timer = setTimeout(() => resolve(null), deadlineMs)
   })
   try {
-    const home = await Promise.race([getWslHomeAsync(distro), deadline])
+    const home = await Promise.race([wslHomeUnlessStopped(distro), deadline])
     return workspaceRootForMirrorHome(repoPath, settings.workspaceDir, home)
   } finally {
     clearTimeout(timer)

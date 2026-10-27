@@ -19,8 +19,10 @@ import {
 import {
   _resetWslBackgroundDistroGateForTests,
   deferUntilWslDistroRunning,
+  noteWslDistroLaunched,
   WSL_STOP_SETTLE_MS
 } from '../wsl-background-distro-gate'
+import { EXIT_SETTLE_MS } from './wsl-orcad-liveness-evidence'
 import {
   _resetRunningWslDistroCacheForTests,
   resolveRunningWslDistros
@@ -212,5 +214,30 @@ describe('runAsWslUserAct', () => {
     await guardWslUncPathAccess(UNC, async () => 'read', { wake: true })
     await expect(guardWslUncPathAccess(UNC, async () => 'read')).resolves.toBe('read')
     expect(probe).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('explicit acts that start a distro', () => {
+  it('a wsl.exe launch for a distro last read as stopped makes background reads look again', async () => {
+    running = []
+    await expect(guardWslUncPathAccess(UNC, async () => 'read')).rejects.toBeInstanceOf(
+      WslDistroStoppedError
+    )
+    // A commit or a WSL terminal ran through wsl.exe and started it.
+    running = ['Ubuntu']
+    noteWslDistroLaunched('Ubuntu')
+    await expect(guardWslUncPathAccess(UNC, async () => 'read')).resolves.toBe('read')
+    expect(probe).toHaveBeenCalledTimes(2)
+  })
+
+  it('a launch for a distro already read as running costs no extra read', async () => {
+    await guardWslUncPathAccess(UNC, async () => 'read')
+    noteWslDistroLaunched('Ubuntu')
+    await guardWslUncPathAccess(UNC, async () => 'read')
+    expect(probe).toHaveBeenCalledOnce()
+  })
+
+  it('settles for as long as the orcad liveness exit window', () => {
+    expect(WSL_STOP_SETTLE_MS).toBe(EXIT_SETTLE_MS)
   })
 })

@@ -1,9 +1,9 @@
 import { listRunningWslDistrosAsync, listWslDistrosAsync } from './wsl'
 import {
   onConfirmedRunningWslDistros,
-  onRunningWslDistrosStopped
+  onRunningWslDistrosStopped,
+  peekConfirmedRunningWslDistros
 } from './wsl-running-distro-cache'
-import { EXIT_SETTLE_MS } from './wsl/wsl-orcad-liveness-evidence'
 
 // Background work must not boot stopped distros: old WSL idle-stop can erase VM-wide WSLInterop (microsoft/WSL#13885).
 
@@ -12,7 +12,8 @@ type DeferredTask = () => unknown
 const deferredTasksByDistro = new Map<string, Map<string, DeferredTask>>()
 let unsubscribeObservations: (() => void) | null = null
 // Right after a stop WSL can still list the distro; a running read started inside this window never counts.
-export const WSL_STOP_SETTLE_MS = EXIT_SETTLE_MS
+// Same window as the orcad liveness EXIT_SETTLE_MS; not imported, to keep this module's graph small.
+export const WSL_STOP_SETTLE_MS = 500
 const mayHaveStoppedAt = new Map<string, number>()
 const wokenAt = new Map<string, number>()
 let unsubscribeStops: (() => void) | null = null
@@ -54,6 +55,14 @@ export function noteWslDistroMayHaveStopped(distro: string): void {
 /** A user act just touched the distro, which starts it: an older 'stopped' read no longer answers. */
 export function noteWslDistroWoken(distro: string): void {
   wokenAt.set(distroKey(distro), performance.now())
+}
+
+/** A wsl.exe launch starts its distro: if the last read said stopped, that read no longer answers. */
+export function noteWslDistroLaunched(distro: string): void {
+  const running = peekConfirmedRunningWslDistros()
+  if (running && !running.some((candidate) => distroKey(candidate) === distroKey(distro))) {
+    noteWslDistroWoken(distro)
+  }
 }
 
 // The earliest start a running read may have: after `startedAfter` and any stop's settle window.
