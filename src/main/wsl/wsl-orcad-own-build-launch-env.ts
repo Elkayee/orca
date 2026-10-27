@@ -6,12 +6,10 @@ export function withOwnBuildLaunchEnv(
   conn: OrcadHostTransport,
   ownBuildVersion: () => string | null
 ): OrcadHostTransport {
-  const launchEnv = conn.orcadLaunchEnv
-  return {
-    ...conn,
-    orcadLaunchEnv: async (launch) => [
-      ...((await launchEnv?.(launch)) ?? []),
-      ...(launch.fullVersion === ownBuildVersion() ? hostMallocTunablesLaunchEnv() : [])
-    ]
-  }
+  const orcadLaunchEnv: OrcadHostTransport['orcadLaunchEnv'] = async (launch) => [
+    ...((await conn.orcadLaunchEnv?.(launch)) ?? []),
+    ...(launch.fullVersion === ownBuildVersion() ? hostMallocTunablesLaunchEnv() : [])
+  ]
+  // Delegate rather than spread: a class-based transport keeps its prototype methods.
+  return Object.create(conn, { orcadLaunchEnv: { value: orcadLaunchEnv } })
 }

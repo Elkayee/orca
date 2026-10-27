@@ -32,4 +32,19 @@ describe('withOwnBuildLaunchEnv', () => {
       ['ORCA_WSL_DISTRO_GUID', 'g']
     ])
   })
+
+  it('keeps a class-based transport’s prototype methods', async () => {
+    class ClassTransport {
+      readonly prefix = 'ran:'
+      exec(command: string): string {
+        return `${this.prefix}${command}`
+      }
+    }
+    // The wrapper only reads orcadLaunchEnv; a bare instance stands in for the full transport.
+    const transport: OrcadHostTransport = Object.create(new ClassTransport())
+    const conn = withOwnBuildLaunchEnv(transport, () => null)
+    expect(Reflect.get(conn, 'exec')).toBe(ClassTransport.prototype.exec)
+    expect(Reflect.get(conn, 'prefix')).toBe('ran:')
+    await expect(conn.orcadLaunchEnv?.({ fullVersion: '0.1.0+own' })).resolves.toEqual([])
+  })
 })
