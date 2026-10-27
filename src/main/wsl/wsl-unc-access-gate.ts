@@ -1,5 +1,7 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import {
+  noteWslDistroWoken,
   noteWslDistrosRunning,
   readWslDistroRunningState,
   type WslDistroRunningState
@@ -11,6 +13,18 @@ export { noteWslDistroMayHaveStopped } from '../wsl-background-distro-gate'
 // Stops are signalled (watcher or relay exit, or a read that saw it), so a running read is trusted
 // this long without one, keeping wsl.exe spawns to about one a minute.
 export const WSL_UNC_RUNNING_LEASE_MS = 60_000
+
+// The distro a user act may start; reads and Git it triggers (e.g. a roots rebuild) pass for it alone.
+const userActDistro = new AsyncLocalStorage<string>()
+
+function distroKey(distro: string): string {
+  return distro.trim().toLowerCase()
+}
+
+/** Runs a user act on `distro`: gated work inside it may start that distro, and no other. */
+export function runAsWslUserAct<T>(distro: string | null, act: () => Promise<T>): Promise<T> {
+  return distro ? userActDistro.run(distroKey(distro), act) : act()
+}
 
 export class WslDistroStoppedError extends Error {
   readonly code = 'WSL_DISTRO_STOPPED'
@@ -51,7 +65,7 @@ export async function blockedWslDistroForPath(
   wslDistro?: string | null
 ): Promise<BlockedWslDistro | null> {
   const distro = wslDistroForPath(path, wslDistro)
-  if (!distro) {
+  if (!distro || userActDistro.getStore() === distroKey(distro)) {
     return null
   }
   const state = await readWslDistroRunningState(distro, {
@@ -71,15 +85,21 @@ export async function guardWslUncPathAccess<T>(
   options: { wake?: boolean } = {}
 ): Promise<T> {
   if (options.wake) {
-    const result = await access()
-    const parsed = process.platform === 'win32' ? parseWslUncPath(path) : null
-    if (parsed) {
-      noteWslDistrosRunning([parsed.distro])
-    }
+    const result = await runAsWslUserAct(wslDistroForPath(path), access)
+    noteWslDistroWokenForPath(path)
     return result
   }
   await assertWslUncPathRunning(path)
   return access()
+}
+
+/** A user act's touch of `path` (or its Git) succeeded: its distro runs now, so waiting work resumes. */
+export function noteWslDistroWokenForPath(path: string, wslDistro?: string | null): void {
+  const distro = wslDistroForPath(path, wslDistro)
+  if (distro) {
+    noteWslDistroWoken(distro)
+    noteWslDistrosRunning([distro])
+  }
 }
 
 /** Throws when a background touch of `path` (or its Git) would boot a distro, or WSL can't say it won't. */

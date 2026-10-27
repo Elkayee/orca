@@ -24,6 +24,7 @@ vi.mock('../local-project-runtime-resolution', () => ({
   resolveLocalProjectRuntimesForRepos: mocks.runtimes
 }))
 import { resolveAuthorizedPath } from './filesystem/filesystem-auth'
+import { runAsWslUserAct } from '../wsl/wsl-unc-access-gate'
 import {
   __resetCreatedWorktreeRootsForTests,
   invalidateAuthorizedRootsCache,
@@ -112,6 +113,16 @@ describe('authorized roots for a repo whose WSL distro is stopped', () => {
     await expect(resolveAuthorizedPath(join(worktree, 'file'), store)).resolves.toBe(
       join(worktree, 'file')
     )
+    expect(mocks.graph).toHaveBeenCalledWith(repo, { wslDistro: DISTRO })
+  })
+
+  it("lists an external worktree's repo when a user act on its distro misses authorization", async () => {
+    const store = fixture()
+    mocks.running.mockResolvedValue(false)
+    // After a relaunch the external worktree is only authorized through the listing.
+    await expect(
+      runAsWslUserAct(DISTRO, () => resolveAuthorizedPath(join(worktree, 'file'), store))
+    ).resolves.toBe(join(worktree, 'file'))
     expect(mocks.graph).toHaveBeenCalledWith(repo, { wslDistro: DISTRO })
   })
 })

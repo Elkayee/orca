@@ -98,4 +98,14 @@ describe('background Git for a stopped WSL distro', () => {
     expect(detectConflictOperationMock).not.toHaveBeenCalled()
     expect(getBranchCompareMock).not.toHaveBeenCalled()
   })
+
+  it("lets the active workspace's first git:status start the distro, but not later polls", async () => {
+    await invoke('git:status', { worktreePath: UNC_ROOT, wakeWslDistro: true }).catch(
+      (error: unknown) => expect(error).not.toBeInstanceOf(WslDistroStoppedError)
+    )
+    expect(isWslDistroRunningMock).not.toHaveBeenCalled()
+    await expect(invoke('git:status', { worktreePath: UNC_ROOT })).rejects.toBeInstanceOf(
+      WslDistroStoppedError
+    )
+  })
 })

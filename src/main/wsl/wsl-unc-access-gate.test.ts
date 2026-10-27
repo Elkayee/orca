@@ -10,6 +10,7 @@ vi.mock('../wsl', () => wslMocks)
 import {
   assertWslUncPathRunning,
   guardWslUncPathAccess,
+  runAsWslUserAct,
   noteWslDistroMayHaveStopped,
   WSL_UNC_RUNNING_LEASE_MS,
   WslDistroStoppedError,
@@ -186,5 +187,30 @@ describe('assertWslUncPathRunning for Git', () => {
     )
     await expect(assertWslUncPathRunning('C:\\repo')).resolves.toBeUndefined()
     expect(probe).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('runAsWslUserAct', () => {
+  it('lets gated work inside a user act start its own distro, and no other', async () => {
+    running = []
+    await runAsWslUserAct('ubuntu', async () => {
+      await expect(assertWslUncPathRunning(UNC)).resolves.toBeUndefined()
+      await expect(
+        assertWslUncPathRunning('\\\\wsl.localhost\\Debian\\repo')
+      ).rejects.toBeInstanceOf(WslDistroStoppedError)
+    })
+    await expect(assertWslUncPathRunning(UNC)).rejects.toBeInstanceOf(WslDistroStoppedError)
+  })
+
+  it('after a user act starts the distro, background reads no longer trust the old stopped read', async () => {
+    running = []
+    await expect(guardWslUncPathAccess(UNC, async () => 'read')).rejects.toBeInstanceOf(
+      WslDistroStoppedError
+    )
+    // The wake read's 9P touch started the distro.
+    running = ['Ubuntu']
+    await guardWslUncPathAccess(UNC, async () => 'read', { wake: true })
+    await expect(guardWslUncPathAccess(UNC, async () => 'read')).resolves.toBe('read')
+    expect(probe).toHaveBeenCalledTimes(2)
   })
 })

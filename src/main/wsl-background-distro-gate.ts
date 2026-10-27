@@ -14,6 +14,7 @@ let unsubscribeObservations: (() => void) | null = null
 // Right after a stop WSL can still list the distro; a running read started inside this window never counts.
 export const WSL_STOP_SETTLE_MS = EXIT_SETTLE_MS
 const mayHaveStoppedAt = new Map<string, number>()
+const wokenAt = new Map<string, number>()
 let unsubscribeStops: (() => void) | null = null
 
 function distroKey(distro: string): string {
@@ -50,6 +51,11 @@ export function noteWslDistroMayHaveStopped(distro: string): void {
   mayHaveStoppedAt.set(distroKey(distro), performance.now())
 }
 
+/** A user act just touched the distro, which starts it: an older 'stopped' read no longer answers. */
+export function noteWslDistroWoken(distro: string): void {
+  wokenAt.set(distroKey(distro), performance.now())
+}
+
 // The earliest start a running read may have: after `startedAfter` and any stop's settle window.
 async function settledStartedAfter(
   distro: string,
@@ -61,10 +67,12 @@ async function settledStartedAfter(
     }
   })
   const stoppedAt = mayHaveStoppedAt.get(distroKey(distro))
-  const anchor =
-    stoppedAt === undefined
-      ? startedAfter
-      : Math.max(startedAfter ?? -Infinity, stoppedAt + WSL_STOP_SETTLE_MS)
+  const woken = wokenAt.get(distroKey(distro))
+  const floor = Math.max(
+    stoppedAt === undefined ? -Infinity : stoppedAt + WSL_STOP_SETTLE_MS,
+    woken ?? -Infinity
+  )
+  const anchor = floor === -Infinity ? startedAfter : Math.max(startedAfter ?? -Infinity, floor)
   const waitMs = (anchor ?? -Infinity) - performance.now()
   if (waitMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, waitMs))
@@ -166,6 +174,7 @@ export function _resetWslBackgroundDistroGateForTests(): void {
   unsubscribeObservations?.()
   unsubscribeObservations = null
   mayHaveStoppedAt.clear()
+  wokenAt.clear()
   unsubscribeStops?.()
   unsubscribeStops = null
 }
